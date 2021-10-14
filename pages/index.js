@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -6,18 +6,22 @@ import {
   StarIcon as StarIconOutline,
   TrashIcon as TrashIconOutline,
 } from "@heroicons/react/outline";
-import {
-  StarIcon as StarIconSolid,
-  TrashIcon as TrashIconSolid,
-} from "@heroicons/react/solid";
+import { StarIcon as StarIconSolid } from "@heroicons/react/solid";
 import { RadioGroup } from "@headlessui/react";
 import Header from "/components/Header";
 
+const api_flash_key = "74579ca6e7354535a91d4425440e1f2b";
 const preloadScreenshot = async (url) => {
-  console.log("preloading " + url);
-  return await fetch(
-    `https://api.apiflash.com/v1/urltoimage?access_key=fa344043e257465ea72e274ee6f519c1&full_page=true&scroll_page=true&url=${url}`
+  const res = await fetch(
+    `https://api.apiflash.com/v1/urltoimage?access_key=${api_flash_key}&full_page=true&scroll_page=true&url=${url}`
   );
+  return res;
+};
+
+const preloadList = async (startups) => {
+  for (const s of startups) {
+    const res = await preloadScreenshot(s.url);
+  }
 };
 
 const jsonFetcher = (url, options) => fetch(url, options).then((r) => r.json());
@@ -49,6 +53,24 @@ const updateStartupRating = async (startupId, rating, isJunk) => {
     }),
   });
 };
+
+const NextAndPrev = ({ startups, index }) => (
+  // Hidden render of next and prev to ensure fast loading
+  <div className="hidden">
+    {index > 0 && (
+      <img
+        src={`https://api.apiflash.com/v1/urltoimage?access_key=${api_flash_key}&full_page=true&scroll_page=true&width=1200&url=${
+          startups[index - 1].url
+        }`}
+      />
+    )}
+    <img
+      src={`https://api.apiflash.com/v1/urltoimage?access_key=${api_flash_key}&full_page=true&scroll_page=true&width=1200&url=${
+        startups[index + 1].url
+      }`}
+    />{" "}
+  </div>
+);
 
 const StarRating = ({ startupId, starRating, setStarRating, onJunkClick }) => {
   const numStars = 5;
@@ -84,19 +106,14 @@ const StarRating = ({ startupId, starRating, setStarRating, onJunkClick }) => {
   );
 };
 
-const preload = async (startups) => {
-  for (const s of startups) {
-    await preloadScreenshot(s.url);
-  }
-};
-
 export default function Home() {
   const [index, setIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [startups, setStartups] = useState();
   const [offset, setOffset] = useState();
   const [starRating, setStarRating] = useState(0);
-  const numToPreload = 2;
+  const previewRef = useRef(null);
+  const numToPreload = 5;
 
   // On init load
   useEffect(async () => {
@@ -106,7 +123,7 @@ export default function Home() {
 
     await preloadScreenshot(r.startups[0].url); // preload first screenshot
     setIsLoading(false); // set loading as false so that first screenshot is rendered
-    preload(r.startups.slice(1)); // preload the rest of the startups screenshots in background
+    preloadList(r.startups.slice(1)); // preload the rest of the startups screenshots in background
   }, []);
 
   useEffect(() => {
@@ -130,19 +147,21 @@ export default function Home() {
   // When index changes
   useEffect(async () => {
     if (startups) {
+      // reset scroll on preview
+      previewRef.current.scrollTop = 0;
+
       // reset star rating
       setStarRating(0);
 
       // if only x more startups left in array, get next page of startups
-      if (index >= startups.length - (numToPreload + 1)) {
+      if (index >= startups.length - numToPreload) {
         const next = await fetchNextPage(offset);
         const newStartupsArr = startups.concat(next.startups);
         setStartups(newStartupsArr);
         setOffset(next.offset);
 
         // preload the new startups' screenshot to be cached in background
-        preload(next.startups);
-        // next.startups(async (startup) => await preloadScreenshot(startup.url));
+        preloadList(next.startups);
       }
     }
   }, [index]);
@@ -151,14 +170,21 @@ export default function Home() {
     <div className="h-screen">
       <Header />
       {isLoading ? (
-        <p className="py-24 text-center">Loading...</p>
+        <p className="py-64 text-center text-large font-semibold text-2xl text-gray-700 ">
+          Loading...
+        </p>
       ) : (
         <div className="bg-gray-200 px-8 h-full pt-12">
           <div className="h-full gap-4 space-y-4 lg:space-y-0 lg:flex lg:items-center ">
             {/* Website Preview  */}
-            <div className="rounded-lg overflow-y-scroll shadow-xl bg-white h-3/5 mt-16 lg:mt-0 lg:w-2/3 lg:h-3/4">
+            <NextAndPrev startups={startups} index={index} /> 
+            <div
+              id="previewWin"
+              ref={previewRef}
+              className="rounded-lg overflow-y-scroll shadow-xl bg-white h-3/5 mt-16 lg:mt-0 lg:w-2/3 lg:h-3/4"
+            >
               <img
-                src={`https://api.apiflash.com/v1/urltoimage?access_key=fa344043e257465ea72e274ee6f519c1&full_page=true&scroll_page=true&width=1200&url=${startups[index].url}`}
+                src={`https://api.apiflash.com/v1/urltoimage?access_key=${api_flash_key}&full_page=true&scroll_page=true&width=1200&url=${startups[index].url}`}
               />
             </div>
 
