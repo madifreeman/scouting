@@ -6,7 +6,7 @@ export default async function me(req, res) {
       const { offset, pageSize } = req.body;
       // buld route
       let route =
-        "https://api.airtable.com/v0/appQUfrKBBc89xFrC/Startups?view=All%20Startups";
+        "https://api.airtable.com/v0/app6qfrezm4DQ9D3A/Startups?view=All%20Startups";
       route =
         route +
         "&fields%5B%5D=Name&fields%5B%5D=Website&fields%5B%5D=City&fields%5B%5D=Country"; // fields to fetch
@@ -21,7 +21,7 @@ export default async function me(req, res) {
         const result = await fetch(route, {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${AIRTABLE_API_KEY}`, // TODO: Use env variable
+            Authorization: `Bearer ${process.env.AIRTABLE_API_KEY}`, // TODO: Use env variable
           },
         }).then((r) => r.json());
         
@@ -46,6 +46,7 @@ export default async function me(req, res) {
     case "PATCH": // update startup with rating
       try {
         const { startupId, rating, isJunk } = req.body;
+        console.log({rating});
         
         const r = airtableClient("Startups").update([
           {
